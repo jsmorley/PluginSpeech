@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
 using System.Speech.Synthesis;
 using System.Threading;
@@ -15,11 +15,12 @@ namespace PluginSpeech
         }
         public IntPtr buffer = IntPtr.Zero;
         public SpeechSynthesizer synth;
+        public ReadOnlyCollection<InstalledVoice> voices;
+        public int voiceCount;
         public VoiceGender gender;
         public int index;
         public Prompt prompt;
         public String selectedName;
-        public double voiceCount;
     }
 
     public class Plugin
@@ -34,13 +35,37 @@ namespace PluginSpeech
             measure.synth = new SpeechSynthesizer();
             measure.prompt = new Prompt("");
 
-            measure.voiceCount = 0.0;
-            foreach (InstalledVoice voice in measure.synth.GetInstalledVoices())
-            {
-                measure.voiceCount++;
-            }
+            measure.voices = measure.synth.GetInstalledVoices();
+            measure.voiceCount = measure.voices.Count;
 
             measure.synth.SetOutputToDefaultAudioDevice();
+
+            int debug = api.ReadInt("Debug", 0);
+
+            if (debug == 1)
+            {
+                api.Log(API.LogType.Notice, "------------------------------");
+                api.Log(API.LogType.Notice, "* Speech.dll - GetInstalledVoices() API");
+
+                int index = 1;
+                foreach (InstalledVoice voice in measure.voices)
+                {
+                    VoiceInfo info = voice.VoiceInfo;
+
+                    api.LogF(API.LogType.Notice, "Index: {0}", index);
+                    api.LogF(API.LogType.Notice, "  Name          : {0}", info.Name);
+                    api.LogF(API.LogType.Notice, "  Gender        : {0}", info.Gender);
+                    api.LogF(API.LogType.Notice, "  Culture       : {0}", info.Culture);
+                    api.LogF(API.LogType.Notice, "  Age           : {0}", info.Age);
+                    api.LogF(API.LogType.Notice, "  Description   : {0}", info.Description);
+                    api.LogF(API.LogType.Notice, "  ID            : {0}", info.Id);
+                    api.LogF(API.LogType.Notice, "  Enabled       : {0}", voice.Enabled);
+
+                    ++index;
+                }
+
+                api.Log(API.LogType.Notice, "------------------------------");
+            }
         }
 
         [DllExport]
@@ -109,8 +134,7 @@ namespace PluginSpeech
             // Setup voice
             int i = 1;
             String selectedName = "";
-
-            foreach (InstalledVoice voice in measure.synth.GetInstalledVoices())
+            foreach (InstalledVoice voice in measure.voices)
             {
                 // If no options are "defined", use the first voice.
                 if (!nameExists && !genderExists && (index <= 0))
@@ -175,8 +199,7 @@ namespace PluginSpeech
         public static double Update(IntPtr data)
         {
             Measure measure = (Measure)data;
-            
-            return measure.voiceCount;
+            return Convert.ToDouble(measure.voiceCount);
         }
 
         [DllExport]
